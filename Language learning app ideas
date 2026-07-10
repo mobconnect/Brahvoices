@@ -1,0 +1,118 @@
+Why this version is useful
+A language-learning version helps you:
+•	teach pronunciation in a repeatable way,
+•	switch voices for different lesson styles,
+•	use Firebase claims for sensitive or community-owned content,
+•	keep the same codebase pattern across future apps.[google +1]
+Important boundary
+If you include Indigenous language content, keep it permission-based and culturally approved; the app should not infer, synthesize, or impersonate Indigenous voices without rights-holder and community approval
+bruhvoices-language/
+  .devcontainer/
+    devcontainer.json
+    Dockerfile
+  functions/
+    setClaims.js
+    verifyToken.js
+  react/
+    LessonPlayer.jsx
+    PhraseList.jsx
+    VoiceSelector.jsx
+    RestrictedPhraseGate.jsx
+  src/
+    auth/
+      claims.js
+      restrictedAccess.js
+    lesson/
+      phraseBank.js
+      lessonState.js
+    voice/
+      voiceModel.js
+      ttsService.js
+      voiceApi.js
+    index.js
+  package.json
+  README.md
+core language learning mode
+// src/lesson/phraseBank.js
+export const PHRASES = [
+  {
+    id: 'p1',
+    text: 'Hello, how are you?',
+    languageCode: 'en-AU',
+    voiceId: 'au-default',
+    category: 'starter'
+  },
+  {
+    id: 'p2',
+    text: 'Please repeat that slowly.',
+    languageCode: 'en-AU',
+    voiceId: 'au-polyglot-1',
+    category: 'practice'
+  },
+  {
+    id: 'p3',
+    text: 'Community-approved phrase.',
+    languageCode: 'en-AU',
+    voiceId: 'community-voice-1',
+    category: 'restricted'
+  }
+];
+voice model
+export const VOICE_STATE = {
+  STANDARD_TTS: 'standard-tts',
+  PUBLIC_ACCESS_APPROVED: 'public-access-approved',
+  COMMUNITY_APPROVED_RESTRICTED: 'community-approved-restricted'
+};
+playback service
+// src/voice/ttsService.js
+import textToSpeech from '@google-cloud/text-to-speech';
+const client = new textToSpeech.TextToSpeechClient();
+
+export async function synthesizeLessonAudio(text, voiceName, languageCode = 'en-AU') {
+  const [response] = await client.synthesizeSpeech({
+    input: { text },
+    voice: { languageCode, name: voiceName },
+    audioConfig: { audioEncoding: 'MP3', speakingRate: 0.9 }
+  });
+  return response.audioContent;
+}
+React lesson player
+import React, { useState } from 'react';
+
+export default function LessonPlayer({ phrases, onPlay }) {
+  const [selected, setSelected] = useState(phrases[0]?.id || '');
+
+  const phrase = phrases.find(p => p.id === selected);
+
+  return (
+    <div>
+      <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+        {phrases.map(p => (
+          <option key={p.id} value={p.id}>{p.text}</option>
+        ))}
+      </select>
+
+      <button onClick={() => onPlay(phrase)}>Play</button>
+    </div>
+  );
+}
+Restricted phase gate
+import React, { useEffect, useState } from 'react';
+import { getAuth } from 'firebase/auth';
+
+export default function RestrictedPhraseGate({ children }) {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    async function check() {
+      const user = getAuth().currentUser;
+      if (!user) return setAllowed(false);
+      const token = await user.getIdTokenResult(true);
+      setAllowed(token.claims.communityVoiceAccess === true);
+    }
+    check();
+  }, []);
+
+  return allowed ? children : <p>This phrase requires approval.</p>;
+}
+
