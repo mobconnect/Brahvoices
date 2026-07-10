@@ -1,0 +1,544 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {}
+}
+mobconnect/
+  .devcontainer/
+    devcontainer.json
+    Dockerfile
+  src/
+    auth/
+      client.js
+      claims.js
+      restrictedAccess.js
+    voiceModel.js
+    ttsService.js
+  react/
+    RestrictedVoiceGate.jsx
+    VoiceSelector.jsx
+    VoiceDemo.jsx
+  functions/
+    setClaims.js
+    verifyToken.js
+  package.json
+  README.md
+{
+  "name": "mobconnect-community-tts",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "forwardPorts": [3000, 5001, 8080],
+  "postCreateCommand": "npm install",
+  "remoteUser": "node"
+}
+FROM mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm
+
+WORKDIR /workspace/mobconnect
+
+RUN apt-get update && apt-get install -y \
+  python3 \
+  build-essential \
+  && rm -rf /var/lib/apt/lists/*
+{
+  "name": "mobconnect-community-tts",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/voiceModel.js",
+  "scripts": {
+    "dev": "node src/ttsService.js",
+    "example": "node functions/setClaims.js"
+  },
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^5.6.0",
+    "firebase-admin": "^12.7.0",
+    "firebase": "^10.13.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
+import { getAuth } from 'firebase/auth';
+
+export function getCurrentUser() {
+  return getAuth().currentUser;
+}
+export async function hasCommunityVoiceAccess(user) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult(true);
+  return token.claims.communityVoiceAccess === true;
+}
+import { hasCommunityVoiceAccess } from './claims.js';
+
+export async function canAccessRestrictedVoice(user, voiceContext = {}) {
+  const allowedByAuth = await hasCommunityVoiceAccess(user);
+  return Boolean(
+    allowedByAuth &&
+    voiceContext.fpic === true &&
+    voiceContext.rightsHolderApproved === true &&
+    voiceContext.communityApproved === true &&
+    voiceContext.usageScope
+  );
+}
+import admin from 'firebase-admin';
+
+admin.initializeApp();
+
+export async function grantCommunityVoiceAccess(uid) {
+  await admin.auth().setCustomUserClaims(uid, {
+    communityVoiceAccess: true,
+    restrictedVoiceRole: 'approved'
+  });
+}
+import admin from 'firebase-admin';
+
+admin.initializeApp();
+
+export async function verifyRestrictedToken(req, res, next) {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    const decoded = await admin.auth().verifyIdToken(token);
+
+    if (decoded.communityVoiceAccess !== true) {
+      return res.status(403).json({ error: 'Restricted voice access denied' });
+    }
+
+    next();
+  } catch {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+import React, { useEffect, useState } from 'react';
+import { getAuth } from 'firebase/auth';
+
+export default function RestrictedVoiceGate({ children }) {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    async function check() {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) return setAllowed(false);
+
+      const tokenResult = await user.getIdTokenResult(true);
+      setAllowed(tokenResult.claims.communityVoiceAccess === true);
+    }
+    check();
+  }, []);
+
+  if (!allowed) return <p>This voice requires community approval.</p>;
+  return children;
+}
+import React from 'react';
+
+export default function VoiceSelector({ voices, value, onChange }) {
+  return (
+    <label>
+      Voice
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {voices.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+import React, { useState } from 'react';
+import VoiceSelector from './VoiceSelector.jsx';
+import RestrictedVoiceGate from './RestrictedVoiceGate.jsx';
+
+const voices = [
+  { id: 'au-default', label: 'Australian English default' },
+  { id: 'au-polyglot-1', label: 'Australian English polyglot' },
+  { id: 'archive-approved-1', label: 'Public-access approved archive audio' },
+  { id: 'community-voice-1', label: 'Community-approved restricted voice' }
+];
+
+export default function VoiceDemo() {
+  const [voiceId, setVoiceId] = useState('au-default');
+
+  return (
+    <div>
+      <VoiceSelector voices={voices} value={voiceId} onChange={setVoiceId} />
+      {voiceId === 'community-voice-1' ? (
+        <RestrictedVoiceGate>
+          <p>Restricted voice enabled for this user.</p>
+        </RestrictedVoiceGate>
+      ) : (
+        <p>Standard voice selected.</p>
+      )}
+    </div>
+  );
+}
+mobconnect/
+  .devcontainer/
+    devcontainer.json
+    Dockerfile
+  functions/
+    setClaims.js
+    verifyToken.js
+  react/
+    RestrictedVoiceGate.jsx
+    VoiceSelector.jsx
+    VoiceDemo.jsx
+  src/
+    auth/
+      client.js
+      claims.js
+      restrictedAccess.js
+    consentPolicy.js
+    index.js
+    ttsService.js
+    voiceApi.js
+    voiceModel.js
+  .gitignore
+  package.json
+  README.md
+{
+  "name": "mobconnect-community-tts",
+  "build": { "dockerfile": "Dockerfile" },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "forwardPorts": [3000, 5001, 8080],
+  "postCreateCommand": "npm install",
+  "remoteUser": "node"
+}
+FROM mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm
+
+WORKDIR /workspace/mobconnect
+
+RUN apt-get update && apt-get install -y \
+  python3 \
+  build-essential \
+  && rm -rf /var/lib/apt/lists/*
+{
+  "name": "mobconnect-community-tts",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node src/index.js",
+    "example": "node functions/setClaims.js"
+  },
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^5.6.0",
+    "firebase": "^10.13.1",
+    "firebase-admin": "^12.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
+export const VOICE_STATE = {
+  STANDARD_TTS: 'standard-tts',
+  PUBLIC_ACCESS_APPROVED: 'public-access-approved',
+  COMMUNITY_APPROVED_RESTRICTED: 'community-approved-restricted'
+};
+
+export const VOICE_REGISTRY = [
+  {
+    id: 'au-default',
+    label: 'Australian English default',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Neural2-A'
+  },
+  {
+    id: 'au-polyglot-1',
+    label: 'Australian English polyglot',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Polyglot-1'
+  },
+  {
+    id: 'archive-approved-1',
+    label: 'Public-access approved archive audio',
+    state: VOICE_STATE.PUBLIC_ACCESS_APPROVED,
+    accessApproved: true
+  },
+  {
+    id: 'community-voice-1',
+    label: 'Community-approved restricted voice',
+    state: VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED
+  }
+];
+
+export function canUseVoice(asset, context = {}) {
+  if (!asset) return false;
+  if (asset.state === VOICE_STATE.STANDARD_TTS) return true;
+  if (asset.state === VOICE_STATE.PUBLIC_ACCESS_APPROVED) return asset.accessApproved === true;
+  if (asset.state === VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED) {
+    return Boolean(
+      context.communityVoiceAccess === true &&
+      context.fpic === true &&
+      context.rightsHolderApproved === true &&
+      context.communityApproved === true &&
+      context.usageScope
+    );
+  }
+  return false;
+}
+
+export function resolveVoice(assetId, context = {}) {
+  const asset = VOICE_REGISTRY.find(v => v.id === assetId);
+  if (!asset) throw new Error(`Unknown voice asset: ${assetId}`);
+  if (!canUseVoice(asset, context)) throw new Error(`Voice not approved for use: ${assetId}`);
+  return asset;
+}
+export function explainApproval(context = {}) {
+  return {
+    communityVoiceAccess: context.communityVoiceAccess === true,
+    fpic: context.fpic === true,
+    rightsHolderApproved: context.rightsHolderApproved === true,
+    communityApproved: context.communityApproved === true,
+    usageScope: Boolean(context.usageScope)
+  };
+}
+
+export function isCommunityApproved(context = {}) {
+  return Boolean(
+    context.communityVoiceAccess === true &&
+    context.fpic === true &&
+    context.rightsHolderApproved === true &&
+    context.communityApproved === true &&
+    context.usageScope
+  );
+}
+import textToSpeech from '@google-cloud/text-to-speech';
+import fs from 'fs';
+import path from 'path';
+import { resolveVoice, VOICE_STATE } from './voiceModel.js';
+
+const client = new textToSpeech.TextToSpeechClient();
+
+export async function synthesizeToFile({
+  text,
+  assetId = 'au-default',
+  context = {},
+  outputFile = 'output/speech.mp3',
+  speakingRate = 1.0,
+  pitch = 0.0
+}) {
+  const asset = resolveVoice(assetId, context);
+
+  if (asset.state !== VOICE_STATE.STANDARD_TTS) {
+    throw new Error('This asset is not a Google TTS voice. Use your approved audio playback pipeline.');
+  }
+
+  const [response] = await client.synthesizeSpeech({
+    input: { text },
+    voice: { languageCode: asset.languageCode, name: asset.voiceName },
+    audioConfig: { audioEncoding: 'MP3', speakingRate, pitch }
+  });
+
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+  fs.writeFileSync(outputFile, response.audioContent, 'binary');
+  return outputFile;
+}
+export async function fetchGoogleVoices() {
+  const res = await fetch('https://texttospeech.googleapis.com/v1/voices');
+  if (!res.ok) throw new Error('Unable to fetch voices');
+  return await res.json();
+}
+export async function hasCommunityVoiceAccess(user) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult(true);
+  return token.claims.communityVoiceAccess === true;
+}
+export async function hasCommunityVoiceAccess(user) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult(true);
+  return token.claims.communityVoiceAccess === true;
+}
+export { VOICE_STATE, VOICE_REGISTRY, canUseVoice, resolveVoice } from './voiceModel.js';
+export { explainApproval, isCommunityApproved } from './consentPolicy.js';
+export { synthesizeToFile } from './ttsService.js';
+export { fetchGoogleVoices } from './voiceApi.js';
+export { VOICE_STATE, VOICE_REGISTRY, canUseVoice, resolveVoice } from './voiceModel.js';
+export { explainApproval, isCommunityApproved } from './consentPolicy.js';
+export { synthesizeToFile } from './ttsService.js';
+export { fetchGoogleVoices } from './voiceApi.js';
+import admin from 'firebase-admin';
+
+admin.initializeApp();
+
+export async function verifyRestrictedToken(req, res, next) {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    const decoded = await admin.auth().verifyIdToken(token);
+
+    if (decoded.communityVoiceAccess !== true) {
+      return res.status(403).json({ error: 'Restricted voice access denied' });
+    }
+
+    next();
+  } catch {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+import admin from 'firebase-admin';
+
+admin.initializeApp();
+
+export async function verifyRestrictedToken(req, res, next) {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    const decoded = await admin.auth().verifyIdToken(token);
+
+    if (decoded.communityVoiceAccess !== true) {
+      return res.status(403).json({ error: 'Restricted voice access denied' });
+    }
+
+    next();
+  } catch {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+import React, { useEffect, useState } from 'react';
+import { getAuth } from 'firebase/auth';
+
+export default function RestrictedVoiceGate({ children }) {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    async function check() {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) return setAllowed(false);
+
+      const tokenResult = await user.getIdTokenResult(true);
+      setAllowed(tokenResult.claims.communityVoiceAccess === true);
+    }
+    check();
+  }, []);
+
+  if (!allowed) return <p>This voice requires community approval.</p>;
+  return children;
+}
+import React, { useEffect, useState } from 'react';
+import { getAuth } from 'firebase/auth';
+
+export default function RestrictedVoiceGate({ children }) {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    async function check() {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) return setAllowed(false);
+
+      const tokenResult = await user.getIdTokenResult(true);
+      setAllowed(tokenResult.claims.communityVoiceAccess === true);
+    }
+    check();
+  }, []);
+
+  if (!allowed) return <p>This voice requires community approval.</p>;
+  return children;
+}
+import React, { useEffect, useState } from 'react';
+import { getAuth } from 'firebase/auth';
+
+export default function RestrictedVoiceGate({ children }) {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    async function check() {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) return setAllowed(false);
+
+      const tokenResult = await user.getIdTokenResult(true);
+      setAllowed(tokenResult.claims.communityVoiceAccess === true);
+    }
+    check();
+  }, []);
+
+  if (!allowed) return <p>This voice requires community approval.</p>;
+  return children;
+}
+import React from 'react';
+
+export default function VoiceSelector({ voices, value, onChange }) {
+  return (
+    <label>
+      Voice
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {voices.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+import React, { useState } from 'react';
+import VoiceSelector from './VoiceSelector.jsx';
+import RestrictedVoiceGate from './RestrictedVoiceGate.jsx';
+
+const voices = [
+  { id: 'au-default', label: 'Australian English default' },
+  { id: 'au-polyglot-1', label: 'Australian English polyglot' },
+  { id: 'archive-approved-1', label: 'Public-access approved archive audio' },
+  { id: 'community-voice-1', label: 'Community-approved restricted voice' }
+];
+
+export default function VoiceDemo() {
+  const [voiceId, setVoiceId] = useState('au-default');
+
+  return (
+    <div>
+      <VoiceSelector voices={voices} value={voiceId} onChange={setVoiceId} />
+      {voiceId === 'community-voice-1' ? (
+        <RestrictedVoiceGate>
+          <p>Restricted voice enabled for this user.</p>
+        </RestrictedVoiceGate>
+      ) : (
+        <p>Standard voice selected.</p>
+      )}
+    </div>
+  );
+}
+node_modules
+.env
+output
+# MobConnect Community TTS
+
+Consent-controlled speech package for app builders.
+
+## What it does
+- Standard Australian English TTS via Google Cloud.
+- Public-access approved archive audio.
+- Community-approved restricted audio behind Firebase custom claims and cultural approval checks.
+
+## Install
+```bash
+npm install
+npm run example
+
+## What this gives you
+This repo structure gives you:
+- a dev container for consistent setup,
+- a voice-state model,
+- Firebase auth gating for restricted voices,
+- a React selector and gate,
+- and Google TTS for standard Australian voices.[3][4][1]
+
+AIATSIS access rules still apply to any Indigenous audio asset, so the restricted path must stay approval-based and permission-controlled.[5][6]
+
+Would you like me to turn this into a single zipped “copy this into GitHub” checklist with file-by-file commit order?
+
