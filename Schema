@@ -1,0 +1,72 @@
+export const themeManifest = [
+  {
+    id: 'earth-dot-01',
+    title: 'Earth Dot Path',
+    category: 'community',
+    artist: {
+      name: 'Artist Name',
+      collective: 'Art Centre / Community',
+      country: 'Yolngu / Arrernte / etc',
+      region: 'Northern Territory'
+    },
+    approvals: {
+      artistApproved: true,
+      communityApproved: true,
+      publicationApproved: true
+    },
+    licensing: {
+      icipRespect: true,
+      licenseType: 'personal-use',
+      commercialUse: false,
+      royaltyShare: '50%',
+      expiry: null
+    },
+    provenance: {
+      createdAt: '2026-07-10',
+      version: '1.0.0',
+      source: 'commissioned',
+      attributionText: 'Artwork by Artist Name in partnership with Art Centre / Community'
+    },
+    accessibility: {
+      contrastSafe: true,
+      motionSafe: true,
+      readableText: true
+    },
+    assets: {
+      previewImage: '/themes/earth-dot-01/preview.png',
+      patternCss: 'dots',
+      backgroundImage: '/themes/earth-dot-01/bg.png'
+    }
+  }
+];
+react usage 
+export function ThemePackCard({ pack, onPreview }) {
+  return (
+    <article className="theme-card">
+      <img src={pack.assets.previewImage} alt={pack.title} />
+      <h3>{pack.title}</h3>
+      <p>{pack.artist.name}</p>
+      <p>{pack.artist.country}</p>
+      <p>{pack.licensing.licenseType}</p>
+      <p>{pack.attributionText}</p>
+      <button onClick={() => onPreview(pack.id)}>Preview</button>
+    </article>
+  );
+}
+
+validation helper
+export function isThemePackValid(pack) {
+  return Boolean(
+    pack?.id &&
+    pack?.title &&
+    pack?.artist?.name &&
+    pack?.artist?.country &&
+    pack?.approvals?.artistApproved === true &&
+    pack?.approvals?.communityApproved === true &&
+    pack?.approvals?.publicationApproved === true &&
+    pack?.licensing?.icipRespect === true &&
+    pack?.assets?.previewImage
+  );
+}
+
+
