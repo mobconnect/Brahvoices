@@ -1,0 +1,328 @@
+Folder tree
+bruhvoices-core/
+  src/
+    auth/
+      claims.js
+      restrictedAccess.js
+    lesson/
+      phraseBank.js
+      lessonStore.js
+      lessonFilters.js
+    theme/
+      themeManifest.js
+      applyTheme.js
+      themeStore.js
+    voice/
+      voiceModel.js
+      voiceDiscovery.js
+      voicePicker.js
+    utils/
+      accessExplain.js
+      storage.js
+    index.js
+  package.json
+  README.md
+package.json
+{
+  "name": "bruhvoices-core",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "node -e \"import('./src/index.js').then(()=>console.log('ok'))\""
+  },
+  "dependencies": {}
+}
+
+src voice model.js
+export const VOICE_STATE = {
+  STANDARD_TTS: 'standard-tts',
+  PUBLIC_ACCESS_APPROVED: 'public-access-approved',
+  COMMUNITY_APPROVED_RESTRICTED: 'community-approved-restricted'
+};
+
+export const VOICE_REGISTRY = [
+  {
+    id: 'au-default',
+    label: 'Australian English default',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Neural2-A'
+  },
+  {
+    id: 'au-polyglot-1',
+    label: 'Australian English polyglot',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Polyglot-1'
+  },
+  {
+    id: 'archive-approved-1',
+    label: 'Public-access approved archive audio',
+    state: VOICE_STATE.PUBLIC_ACCESS_APPROVED,
+    accessApproved: true
+  },
+  {
+    id: 'community-voice-1',
+    label: 'Community-approved restricted voice',
+    state: VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED
+  }
+];
+
+export function canUseVoice(asset, context = {}) {
+  if (!asset) return false;
+  if (asset.state === VOICE_STATE.STANDARD_TTS) return true;
+  if (asset.state === VOICE_STATE.PUBLIC_ACCESS_APPROVED) return asset.accessApproved === true;
+  if (asset.state === VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED) {
+    return Boolean(
+      context.communityVoiceAccess === true &&
+      context.fpic === true &&
+      context.rightsHolderApproved === true &&
+      context.communityApproved === true &&
+      context.usageScope
+    );
+  }
+  return false;
+}
+
+export function resolveVoice(assetId, context = {}) {
+  const asset = VOICE_REGISTRY.find(v => v.id === assetId);
+  if (!asset) throw new Error(`Unknown voice asset: ${assetId}`);
+  if (!canUseVoice(asset, context)) throw new Error(`Voice not approved for use: ${assetId}`);
+  return asset;
+}
+
+src voice discovery.js
+export async function discoverVoices(languageCode = 'en-AU') {
+  const url = new URL('https://texttospeech.googleapis.com/v1/voices');
+  url.searchParams.set('languageCode', languageCode);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error('Failed to load voices');
+
+  const data = await res.json();
+  return (data.voices || []).map(v => ({
+    name: v.name,
+    languageCodes: v.languageCodes || [],
+    sampleRate: v.naturalSampleRateHertz || null,
+    gender: v.ssmlGender || null
+  }));
+}
+
+src voice picker.js
+export function makeVoiceOptions(voices = []) {
+  return voices.map(v => ({
+    id: v.id || v.name,
+    label: v.label || v.name,
+    languageCode: v.languageCode || (v.languageCodes ? v.languageCodes[0] : null),
+    voiceName: v.voiceName || v.name,
+    state: v.state || 'standard-tts'
+  }));
+}
+
+src/auth/claims.js
+export async function hasCommunityVoiceAccess(user) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult(true);
+  return token.claims.communityVoiceAccess === true;
+}
+
+import { hasCommunityVoiceAccess } from './claims.js';
+
+export async function canAccessRestrictedVoice(user, voiceContext = {}) {
+  const allowedByAuth = await hasCommunityVoiceAccess(user);
+  return Boolean(
+    allowedByAuth &&
+    voiceContext.fpic === true &&
+    voiceContext.rightsHolderApproved === true &&
+    voiceContext.communityApproved === true &&
+    voiceContext.usageScope
+  );
+}
+
+src lesson.js
+export const PHRASES = [
+  { id: 'p1', text: 'Hello, how are you?', languageCode: 'en-AU', voiceId: 'au-default', category: 'starter' },
+  { id: 'p2', text: 'Please repeat that slowly.', languageCode: 'en-AU', voiceId: 'au-polyglot-1', category: 'practice' },
+  { id: 'p3', text: 'Community-approved phrase.', languageCode: 'en-AU', voiceId: 'community-voice-1', category: 'restricted' }
+];
+
+src lessonstore.js
+const KEY = 'bruhvoices-lesson-progress';
+
+export function loadLessonProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+export function saveLessonProgress(progress) {
+  localStorage.setItem(KEY, JSON.stringify(progress));
+}
+
+export function markPhraseDone(phraseId) {
+  const progress = loadLessonProgress();
+  progress[phraseId] = { done: true, updatedAt: new Date().toISOString() };
+  saveLessonProgress(progress);
+  return progress;
+}
+
+src theme manifest.js
+export const THEMES = {
+  default: {
+    label: 'Default',
+    bg: '#ffffff',
+    fg: '#111111',
+    card: '#f6f6f6',
+    accent: '#b45309',
+    radius: 20,
+    pattern: 'none'
+  },
+  earthWarm: {
+    label: 'Earth Warm',
+    bg: '#f5efe6',
+    fg: '#241b17',
+    card: '#fff8ef',
+    accent: '#8b4513',
+    radius: 24,
+    pattern: 'dots'
+  },
+  nightLesson: {
+    label: 'Night Lesson',
+    bg: '#101418',
+    fg: '#e8eef2',
+    card: '#182028',
+    accent: '#7cc0ff',
+    radius: 24,
+    pattern: 'stars'
+  },
+  communityStory: {
+    label: 'Community Story',
+    bg: '#2b1d14',
+    fg: '#fff3e0',
+    card: '#3a271b',
+    accent: '#f4a261',
+    radius: 28,
+    pattern: 'meeting-circles',
+    approvedAssetId: 'art-pack-001'
+  },
+  highContrast: {
+    label: 'High Contrast',
+    bg: '#000000',
+    fg: '#ffffff',
+    card: '#121212',
+    accent: '#ffd54f',
+    radius: 18,
+    pattern: 'none'
+  }
+};
+
+export const APPROVED_ART_PACKS = {
+  'art-pack-001': {
+    label: 'Approved community art pack',
+    licensed: true,
+    artistAttribution: true,
+    usageScope: 'Bruhvoices app themes'
+  }
+};
+
+src applytheme.js
+export function applyTheme(theme) {
+  const root = document.documentElement;
+  root.style.setProperty('--bg', theme.bg);
+  root.style.setProperty('--fg', theme.fg);
+  root.style.setProperty('--card', theme.card);
+  root.style.setProperty('--accent', theme.accent);
+  root.style.setProperty('--radius', `${theme.radius}px`);
+}
+
+src themestore.js
+const KEY = 'bruhvoices-theme';
+
+export function loadThemeKey() {
+  return localStorage.getItem(KEY) || 'default';
+}
+
+export function saveThemeKey(key) {
+  localStorage.setItem(KEY, key);
+}
+
+src storage.js
+export function readJSON(key, fallback = null) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeJSON(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+src accesExplain.js
+export function explainAccess(claims = {}, context = {}) {
+  const authOk = claims.communityVoiceAccess === true;
+  const culturalOk = Boolean(
+    context.fpic === true &&
+    context.rightsHolderApproved === true &&
+    context.communityApproved === true &&
+    context.usageScope
+  );
+
+  return {
+    authOk,
+    culturalOk,
+    allowed: authOk && culturalOk
+  };
+}
+
+src index.js
+export { VOICE_STATE, VOICE_REGISTRY, canUseVoice, resolveVoice } from './voice/voiceModel.js';
+export { discoverVoices } from './voice/voiceDiscovery.js';
+export { makeVoiceOptions } from './voice/voicePicker.js';
+
+export { hasCommunityVoiceAccess } from './auth/claims.js';
+export { canAccessRestrictedVoice } from './auth/restrictedAccess.js';
+
+export { PHRASES } from './lesson/phraseBank.js';
+export { filterPhrases } from './lesson/lessonFilters.js';
+export { loadLessonProgress, saveLessonProgress, markPhraseDone } from './lesson/lessonStore.js';
+
+export { THEMES, APPROVED_ART_PACKS } from './theme/themeManifest.js';
+export { applyTheme } from './theme/applyTheme.js';
+export { loadThemeKey, saveThemeKey } from './theme/themeStore.js';
+
+export { readJSON, writeJSON } from './utils/storage.js';
+export { explainAccess } from './utils/accessExplain.js';
+
+Readme.md
+# Bruhvoices Core
+
+Shared core for web and React Native variants of Bruhvoices.
+
+## Features
+- Voice state model.
+- Google voice discovery.
+- Firebase claim checks.
+- Lesson phrase store.
+- Theme manifest and theme persistence.
+- Access explanation helper.
+
+## Notes
+Restricted voices require:
+- communityVoiceAccess claim,
+- FPIC,
+- rights-holder approval,
+- community approval,
+- usage scope.
+
+
+
+
+
+
+
