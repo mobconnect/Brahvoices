@@ -317,3 +317,32 @@ export default function ThemeSettings() {
 }
 best practice
 
+UI code pattern 
+export const THEME_PACKS = [
+  {
+    id: 'earth-dot-01',
+    title: 'Earth Dot Path',
+    artist: 'Community Artist Name',
+    community: 'Country / Region',
+    status: 'approved',
+    license: 'personal-use',
+    price: 0,
+    preview: '/themes/earth-dot-01.png',
+    attribution: 'Artwork by ...',
+    approvedBy: 'Artist + community'
+  }
+];
+render card
+export function ThemeCard({ pack, onOpen }) {
+  return (
+    <article className="theme-card">
+      <img src={pack.preview} alt={pack.title} />
+      <h3>{pack.title}</h3>
+      <p>{pack.artist}</p>
+      <p>{pack.community}</p>
+      <p>{pack.status}</p>
+      <button onClick={() => onOpen(pack.id)}>Preview</button>
+    </article>
+  );
+}
+
