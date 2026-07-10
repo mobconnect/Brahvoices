@@ -121,3 +121,42 @@ export { approveVoiceAsset } from './approveVoiceAsset.js';
 export { VOICE_REGISTRY } from './voiceRegistry.js';
 export { synthesizeToFile } from './synthesize.js';
 
+export const VOICE_STATE = {
+  STANDARD_TTS: 'standard-tts',
+  PUBLIC_ACCESS_APPROVED: 'public-access-approved',
+  COMMUNITY_APPROVED_RESTRICTED: 'community-approved-restricted'
+};
+
+export function explainVoiceState(state) {
+  switch (state) {
+    case VOICE_STATE.STANDARD_TTS:
+      return 'Google-supported Australian voice for normal synthesis.';
+    case VOICE_STATE.PUBLIC_ACCESS_APPROVED:
+      return 'Archive audio approved for access and use.';
+    case VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED:
+      return 'Indigenous audio that requires rights-holder and community permission.';
+    default:
+      return 'Unknown state.';
+  }
+}
+
+export function canUseVoice(asset, context = {}) {
+  if (!asset) return false;
+
+  if (asset.state === VOICE_STATE.STANDARD_TTS) return true;
+
+  if (asset.state === VOICE_STATE.PUBLIC_ACCESS_APPROVED) {
+    return asset.accessApproved === true;
+  }
+
+  if (asset.state === VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED) {
+    return Boolean(
+      context.fpic === true &&
+      context.rightsHolderApproved === true &&
+      context.communityApproved === true &&
+      context.usageScope
+    );
+  }
+
+  return false;
+}
