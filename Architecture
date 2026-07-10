@@ -1,0 +1,92 @@
+bruhvoices/
+  packages/
+    core/
+      src/
+        voice/
+        auth/
+        lesson/
+        theme/
+        index.js
+    web/
+      src/
+        components/
+        playback/
+        themes/
+        index.js
+    native/
+      src/
+        components/
+        playback/
+        themes/
+        index.js
+core
+voice discovery 
+export async function discoverVoices(languageCode = 'en-AU') {
+  const url = new URL('https://texttospeech.googleapis.com/v1/voices');
+  url.searchParams.set('languageCode', languageCode);
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.voices || [];
+}
+claims check
+export async function hasCommunityVoiceAccess(user) {
+  if (!user) return false;
+  const token = await user.getIdTokenResult(true);
+  return token.claims.communityVoiceAccess === true;
+}
+voice gate
+export function canUseVoice(asset, context = {}) {
+  if (asset.state === 'standard-tts') return true;
+  if (asset.state === 'public-access-approved') return asset.accessApproved === true;
+
+  if (asset.state === 'community-approved-restricted') {
+    return Boolean(
+      context.communityVoiceAccess === true &&
+      context.fpic === true &&
+      context.rightsHolderApproved === true &&
+      context.communityApproved === true &&
+      context.usageScope
+    );
+  }
+
+  return false;
+}
+UI
+components
+export function ThemePicker({ value, onChange, themes }) {
+  return (
+    <label>
+      Display style
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {Object.entries(themes).map(([key, theme]) => (
+          <option key={key} value={key}>{theme.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+voice selector
+export function VoiceSelector({ voices, value, onChange }) {
+  return (
+    <label>
+      Voice
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {voices.map(v => (
+          <option key={v.id} value={v.id}>{v.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+lesson cards 
+export function LessonCard({ title, subtitle, badge }) {
+  return (
+    <article className="card">
+      <h3>{title}</h3>
+      <p>{subtitle}</p>
+      {badge ? <span>{badge}</span> : null}
+    </article>
+  );
+}
+
+
