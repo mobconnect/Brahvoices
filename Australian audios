@@ -1,0 +1,79 @@
+architecture
+// src/audio/audioProfile.js
+export const AUDIO_PROFILE = {
+  standardAustralian: {
+    label: 'Standard Australian',
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Neural2-A',
+    speakingRate: 1.0,
+    pitch: 0.0,
+    breakMs: 180
+  },
+  warmLesson: {
+    label: 'Warm Lesson',
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Neural2-A',
+    speakingRate: 0.92,
+    pitch: -1.0,
+    breakMs: 220
+  },
+  slowPractice: {
+    label: 'Slow Practice',
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Polyglot-1',
+    speakingRate: 0.8,
+    pitch: -0.5,
+    breakMs: 300
+  },
+  communityApproved: {
+    label: 'Community-approved audio',
+    languageCode: 'en-AU',
+    voiceName: null,
+    speakingRate: 1.0,
+    pitch: 0.0,
+    breakMs: 180,
+    requiresApproval: true
+  }
+};
+
+// src/audio/ssmlBuilder.js
+export function buildSSML(text, profile) {
+  const breaks = `<break time="${profile.breakMs || 180}ms"/>`;
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `<speak><prosody rate="${profile.speakingRate * 100}%"
+    pitch="${profile.pitch}st">${escaped}${breaks}</prosody></speak>`;
+}
+
+// src/audio/synthesizer.js
+import textToSpeech from '@google-cloud/text-to-speech';
+import { buildSSML } from './ssmlBuilder.js';
+
+const client = new textToSpeech.TextToSpeechClient();
+
+export async function synthesizeAudio({
+  text,
+  profile,
+  outputEncoding = 'MP3'
+}) {
+  if (!profile) throw new Error('Missing audio profile');
+
+  const request = {
+    input: { ssml: buildSSML(text, profile) },
+    voice: {
+      languageCode: profile.languageCode,
+      name: profile.voiceName || undefined
+    },
+    audioConfig: {
+      audioEncoding: outputEncoding,
+      speakingRate: profile.speakingRate,
+      pitch: profile.pitch
+    }
+  };
+
+  const [response] = await client.synthesizeSpeech(request);
+  return response.audioContent;
+}
+
