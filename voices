@@ -1,0 +1,319 @@
+// src/voiceModel.js
+export const VOICE_STATE = {
+  STANDARD_TTS: 'standard-tts',
+  PUBLIC_ACCESS_APPROVED: 'public-access-approved',
+  COMMUNITY_APPROVED_RESTRICTED: 'community-approved-restricted'
+};
+
+export const VOICE_REGISTRY = [
+  {
+    id: 'au-default',
+    label: 'Australian English default',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Neural2-A',
+    description: 'Google-supported Australian voice'
+  },
+  {
+    id: 'au-polyglot-1',
+    label: 'Australian English polyglot',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Polyglot-1',
+    description: 'Google-supported polyglot Australian voice'
+  },
+  {
+    id: 'archive-approved-1',
+    label: 'Public-access approved archive audio',
+    state: VOICE_STATE.PUBLIC_ACCESS_APPROVED,
+    accessApproved: true,
+    description: 'AIATSIS-approved or equivalent approved collection asset'
+  },
+  {
+    id: 'community-voice-1',
+    label: 'Community-approved restricted voice',
+    state: VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED,
+    description: 'Requires rights-holder and community approval'
+  }
+];
+
+export function canUseVoice(asset, context = {}) {
+  if (!asset) return false;
+
+  if (asset.state === VOICE_STATE.STANDARD_TTS) return true;
+
+  if (asset.state === VOICE_STATE.PUBLIC_ACCESS_APPROVED) {
+    return asset.accessApproved === true;
+  }
+
+  if (asset.state === VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED) {
+    return Boolean(
+      context.fpic === true &&
+      context.rightsHolderApproved === true &&
+      context.communityApproved === true &&
+      context.usageScope &&
+      context.publicationApproved !== false
+    );
+  }
+
+  return false;
+}
+
+export function resolveVoice(assetId, context = {}) {
+  const asset = VOICE_REGISTRY.find(v => v.id === assetId);
+  if (!asset) throw new Error(`Unknown voice asset: ${assetId}`);
+  if (!canUseVoice(asset, context)) throw new Error(`Voice not approved for use: ${assetId}`);
+  return asset;
+}
+
+export function explainVoice(asset) {
+  if (!asset) return 'Unknown voice.';
+  if (asset.state === VOICE_STATE.STANDARD_TTS) return `Use Google TTS voice ${asset.voiceName}.`;
+  if (asset.state === VOICE_STATE.PUBLIC_ACCESS_APPROVED) return 'Use approved archive audio.';
+  if (asset.state === VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED) return 'Use only after community and rights-holder approval.';
+  return 'Unknown voice state.';
+}
+// src/ttsService.js
+import textToSpeech from '@google-cloud/text-to-speech';
+import fs from 'fs';
+import path from 'path';
+import { resolveVoice, VOICE_STATE } from './voiceModel.js';
+
+const client = new textToSpeech.TextToSpeechClient();
+
+export async function synthesizeToFile({
+  text,
+  assetId = 'au-default',
+  context = {},
+  outputFile = 'output/speech.mp3',
+  speakingRate = 1.0,
+  pitch = 0.0
+}) {
+  const asset = resolveVoice(assetId, context);
+
+  if (asset.state !== VOICE_STATE.STANDARD_TTS) {
+    throw new Error('This asset is not a Google TTS voice. Use your approved audio playback pipeline.');
+  }
+
+  const [response] = await client.synthesizeSpeech({
+    input: { text },
+    voice: {
+      languageCode: asset.languageCode,
+      name: asset.voiceName
+    },
+    audioConfig: {
+      audioEncoding: 'MP3',
+      speakingRate,
+      pitch
+    }
+  });
+
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+  fs.writeFileSync(outputFile, response.audioContent, 'binary');
+  return outputFile;
+}
+// src/index.js
+export { VOICE_STATE, VOICE_REGISTRY, canUseVoice, resolveVoice, explainVoice } from './voiceModel.js';
+export { synthesizeToFile } from './ttsService.js';
+import { synthesizeToFile } from './src/index.js';
+
+await synthesizeToFile({
+  text: 'Welcome to SafetyAware.',
+  assetId: 'au-default',
+  outputFile: 'output/welcome.mp3'
+});
+import { resolveVoice } from './src/index.js';
+
+const asset = resolveVoice('community-voice-1', {
+  fpic: true,
+  rightsHolderApproved: true,
+  communityApproved: true,
+  usageScope: 'app-playback',
+  publicationApproved: true
+});
+
+console.log(asset);
+
+mobconnect-community-tts/
+  package.json
+  README.md
+  src/
+    index.js
+    voiceModel.js
+    ttsService.js
+    consentPolicy.js
+    voiceApi.js
+  examples/
+    node-example.js
+  react/
+    VoiceSelector.jsx
+    VoicePlayer.jsx
+    VoiceDemo.jsx
+// src/voiceModel.js
+export const VOICE_STATE = {
+  STANDARD_TTS: 'standard-tts',
+  PUBLIC_ACCESS_APPROVED: 'public-access-approved',
+  COMMUNITY_APPROVED_RESTRICTED: 'community-approved-restricted'
+};
+
+export const VOICE_REGISTRY = [
+  {
+    id: 'au-default',
+    label: 'Australian English default',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Neural2-A'
+  },
+  {
+    id: 'au-polyglot-1',
+    label: 'Australian English polyglot',
+    state: VOICE_STATE.STANDARD_TTS,
+    languageCode: 'en-AU',
+    voiceName: 'en-AU-Polyglot-1'
+  },
+  {
+    id: 'archive-approved-1',
+    label: 'Public-access approved archive audio',
+    state: VOICE_STATE.PUBLIC_ACCESS_APPROVED,
+    accessApproved: true
+  },
+  {
+    id: 'community-voice-1',
+    label: 'Community-approved restricted voice',
+    state: VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED
+  }
+];
+
+export function canUseVoice(asset, context = {}) {
+  if (!asset) return false;
+  if (asset.state === VOICE_STATE.STANDARD_TTS) return true;
+  if (asset.state === VOICE_STATE.PUBLIC_ACCESS_APPROVED) return asset.accessApproved === true;
+  if (asset.state === VOICE_STATE.COMMUNITY_APPROVED_RESTRICTED) {
+    return Boolean(
+      context.fpic === true &&
+      context.rightsHolderApproved === true &&
+      context.communityApproved === true &&
+      context.usageScope
+    );
+  }
+  return false;
+}
+
+export function resolveVoice(assetId, context = {}) {
+  const asset = VOICE_REGISTRY.find(v => v.id === assetId);
+  if (!asset) throw new Error(`Unknown voice asset: ${assetId}`);
+  if (!canUseVoice(asset, context)) throw new Error(`Voice not approved for use: ${assetId}`);
+  return asset;
+}
+// src/consentPolicy.js
+export function explainApproval(context = {}) {
+  return {
+    fpic: context.fpic === true,
+    rightsHolderApproved: context.rightsHolderApproved === true,
+    communityApproved: context.communityApproved === true,
+    usageScope: Boolean(context.usageScope)
+  };
+}
+
+export function isCommunityApproved(context = {}) {
+  return Boolean(
+    context.fpic === true &&
+    context.rightsHolderApproved === true &&
+    context.communityApproved === true &&
+    context.usageScope
+  );
+}
+// src/ttsService.js
+import textToSpeech from '@google-cloud/text-to-speech';
+import fs from 'fs';
+import path from 'path';
+import { resolveVoice, VOICE_STATE } from './voiceModel.js';
+
+const client = new textToSpeech.TextToSpeechClient();
+
+export async function synthesizeToFile({
+  text,
+  assetId = 'au-default',
+  context = {},
+  outputFile = 'output/speech.mp3',
+  speakingRate = 1.0,
+  pitch = 0.0
+}) {
+  const asset = resolveVoice(assetId, context);
+
+  if (asset.state !== VOICE_STATE.STANDARD_TTS) {
+    throw new Error('This asset is not a Google TTS voice. Use your approved audio playback pipeline.');
+  }
+
+  const [response] = await client.synthesizeSpeech({
+    input: { text },
+    voice: { languageCode: asset.languageCode, name: asset.voiceName },
+    audioConfig: { audioEncoding: 'MP3', speakingRate, pitch }
+  });
+
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+  fs.writeFileSync(outputFile, response.audioContent, 'binary');
+  return outputFile;
+}
+// src/index.js
+export { VOICE_STATE, VOICE_REGISTRY, canUseVoice, resolveVoice } from './voiceModel.js';
+export { isCommunityApproved, explainApproval } from './consentPolicy.js';
+export { synthesizeToFile } from './ttsService.js';
+// src/voiceApi.js
+export async function fetchGoogleVoices() {
+  const res = await fetch('https://texttospeech.googleapis.com/v1/voices');
+  if (!res.ok) throw new Error('Unable to fetch voices');
+  return await res.json();
+}
+import React from 'react';
+
+export default function VoiceSelector({ voices, value, onChange }) {
+  return (
+    <label>
+      Voice
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {voices.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+import React from 'react';
+
+export default function VoicePlayer({ audioUrl }) {
+  if (!audioUrl) return null;
+  return <audio controls src={audioUrl} />;
+}
+import React, { useMemo, useState } from 'react';
+import VoiceSelector from './VoiceSelector.jsx';
+
+const voices = [
+  { id: 'au-default', label: 'Australian English default' },
+  { id: 'au-polyglot-1', label: 'Australian English polyglot' },
+  { id: 'archive-approved-1', label: 'Public-access approved archive audio' },
+  { id: 'community-voice-1', label: 'Community-approved restricted voice' }
+];
+
+export default function VoiceDemo() {
+  const [voiceId, setVoiceId] = useState('au-default');
+  const [text, setText] = useState('Welcome to SafetyAware.');
+  const canPreview = useMemo(() => voiceId === 'au-default' || voiceId === 'au-polyglot-1', [voiceId]);
+
+  return (
+    <div>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} />
+      <VoiceSelector voices={voices} value={voiceId} onChange={setVoiceId} />
+      <p>{canPreview ? 'This voice can use Google TTS.' : 'This voice requires approved audio playback.'}</p>
+    </div>
+  );
+}
+import { synthesizeToFile } from './src/index.js';
+
+await synthesizeToFile({
+  text: 'Welcome to the app.',
+  assetId: 'au-default',
+  outputFile: 'output/welcome.mp3'
+});
