@@ -1,0 +1,21 @@
+bruhvoices/
+  src/
+    voiceModel.js
+    consentPolicy.js
+    ttsService.js
+    voiceApi.js
+    auth/
+      claims.js
+      restrictedAccess.js
+  react/
+    VoiceSelector.jsx
+    RestrictedVoiceGate.jsx
+  functions/
+    setClaims.js
+    verifyToken.js
+import { VOICE_REGISTRY, resolveVoice } from 'bruhvoices';
+
+const voice = resolveVoice('au-default');
+import { VOICE_REGISTRY, resolveVoice } from 'bruhvoices';
+
+const voice = resolveVoice('au-default');
