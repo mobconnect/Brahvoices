@@ -1,0 +1,319 @@
+safe code pattern 
+// src/themes/themeRegistry.js
+export const THEMES = {
+  default: {
+    label: 'Default',
+    bg: '#ffffff',
+    fg: '#111111',
+    card: '#f6f6f6',
+    accent: '#b45309'
+  },
+  warmEarth: {
+    label: 'Warm Earth',
+    bg: '#f5efe6',
+    fg: '#1f1b16',
+    card: '#fff8ef',
+    accent: '#8b4513'
+  },
+  highContrast: {
+    label: 'High Contrast',
+    bg: '#000000',
+    fg: '#ffffff',
+    card: '#121212',
+    accent: '#ffd54f'
+  },
+  communityArt: {
+    label: 'Community Art',
+    bg: '#2b1d14',
+    fg: '#fff3e0',
+    card: '#3a271b',
+    accent: '#f4a261',
+    pattern: 'dots-and-paths'
+  },
+  storyPath: {
+    label: 'Story Path',
+    bg: '#fdf1dc',
+    fg: '#2f241f',
+    card: '#fff9f1',
+    accent: '#c46a2b',
+    pattern: 'meeting-circle'
+  },
+  nightLesson: {
+    label: 'Night Lesson',
+    bg: '#101418',
+    fg: '#e8eef2',
+    card: '#182028',
+    accent: '#7cc0ff'
+  }
+};
+apply the theme
+// src/themes/applyTheme.js
+export function applyTheme(theme) {
+  const root = document.documentElement;
+  root.style.setProperty('--bg', theme.bg);
+  root.style.setProperty('--fg', theme.fg);
+  root.style.setProperty('--card', theme.card);
+  root.style.setProperty('--accent', theme.accent);
+}
+
+react theme picker 
+import React from 'react';
+import { THEMES } from './themeRegistry.js';
+
+export default function ThemePicker({ value, onChange }) {
+  return (
+    <label>
+      Theme
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {Object.entries(THEMES).map(([key, theme]) => (
+          <option key={key} value={key}>{theme.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+aboriginal designed displays 
+/* src/themes/communityArt.css */
+.community-art-bg {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(244,162,97,.18) 0 6px, transparent 7px),
+    radial-gradient(circle at 70% 30%, rgba(255,255,255,.12) 0 5px, transparent 6px),
+    linear-gradient(135deg, #2b1d14, #3a271b);
+  color: #fff3e0;
+}
+
+.meeting-circle {
+  border: 2px solid #f4a261;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+}
+display component
+export function LessonCard({ title, subtitle }) {
+  return (
+    <div className="card meeting-circle">
+      <h3>{title}</h3>
+      <p>{subtitle}</p>
+    </div>
+  );
+}
+export function ProgressRing({ value }) {
+  return (
+    <div className="progress-ring">
+      <span>{value}%</span>
+    </div>
+  );
+}
+theme choice logic
+import React, { useState } from 'react';
+import ThemePicker from './ThemePicker.jsx';
+import { THEMES } from './themeRegistry.js';
+import { applyTheme } from './applyTheme.js';
+
+export default function ThemeSettings() {
+  const [themeKey, setThemeKey] = useState('default');
+
+  const handleChange = (key) => {
+    setThemeKey(key);
+    applyTheme(THEMES[key]);
+    localStorage.setItem('bruhvoices-theme', key);
+  };
+
+  return (
+    <div>
+      <ThemePicker value={themeKey} onChange={handleChange} />
+      <p>Users can choose a visual style that suits their learning and accessibility needs.</p>
+    </div>
+  );
+}
+code design pattern 
+// src/themes/themeManifest.js
+export const THEMES = {
+  default: {
+    label: 'Default',
+    bg: '#ffffff',
+    fg: '#111111',
+    card: '#f6f6f6',
+    accent: '#b45309',
+    borderRadius: 20,
+    pattern: 'none'
+  },
+  earthWarm: {
+    label: 'Earth Warm',
+    bg: '#f5efe6',
+    fg: '#241b17',
+    card: '#fff8ef',
+    accent: '#8b4513',
+    borderRadius: 24,
+    pattern: 'dots'
+  },
+  nightLesson: {
+    label: 'Night Lesson',
+    bg: '#101418',
+    fg: '#e8eef2',
+    card: '#182028',
+    accent: '#7cc0ff',
+    borderRadius: 24,
+    pattern: 'stars'
+  },
+  communityStory: {
+    label: 'Community Story',
+    bg: '#2b1d14',
+    fg: '#fff3e0',
+    card: '#3a271b',
+    accent: '#f4a261',
+    borderRadius: 28,
+    pattern: 'meeting-circles',
+    approvedAssetId: 'art-pack-001'
+  },
+  highContrast: {
+    label: 'High Contrast',
+    bg: '#000000',
+    fg: '#ffffff',
+    card: '#121212',
+    accent: '#ffd54f',
+    borderRadius: 18,
+    pattern: 'none'
+  }
+};
+pattern renderer
+// src/themes/PatternBackdrop.jsx
+import React from 'react';
+
+export default function PatternBackdrop({ pattern }) {
+  if (pattern === 'none') return null;
+
+  return (
+    <div className={`pattern pattern-${pattern}`} aria-hidden="true" />
+  );
+}
+css
+/* src/themes/patterns.css */
+.pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.14;
+}
+
+.pattern-dots {
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.pattern-meeting-circles {
+  background:
+    radial-gradient(circle at 25% 30%, currentColor 0 3px, transparent 4px),
+    radial-gradient(circle at 70% 65%, currentColor 0 3px, transparent 4px),
+    radial-gradient(circle at 55% 20%, currentColor 0 2px, transparent 3px);
+  background-size: 120px 120px;
+}
+
+.pattern-stars {
+  background-image:
+    radial-gradient(circle at 20% 20%, currentColor 0 2px, transparent 3px),
+    radial-gradient(circle at 80% 30%, currentColor 0 2px, transparent 3px),
+    radial-gradient(circle at 40% 70%, currentColor 0 2px, transparent 3px);
+}
+thene application 
+// src/themes/applyTheme.js
+export function applyTheme(theme) {
+  const root = document.documentElement;
+  root.style.setProperty('--bg', theme.bg);
+  root.style.setProperty('--fg', theme.fg);
+  root.style.setProperty('--card', theme.card);
+  root.style.setProperty('--accent', theme.accent);
+  root.style.setProperty('--radius', `${theme.borderRadius}px`);
+}
+
+theme picker UI
+// src/themes/ThemePicker.jsx
+import React from 'react';
+import { THEMES } from './themeManifest.js';
+
+export default function ThemePicker({ value, onChange }) {
+  return (
+    <label>
+      Display style
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {Object.entries(THEMES).map(([key, theme]) => (
+          <option key={key} value={key}>{theme.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+modern lesson card
+// src/ui/LessonCard.jsx
+import React from 'react';
+
+export default function LessonCard({ title, subtitle, progress = 0 }) {
+  return (
+    <article className="lesson-card">
+      <header>
+        <h3>{title}</h3>
+        <p>{subtitle}</p>
+      </header>
+      <div className="progress">
+        <div className="bar" style={{ width: `${progress}%` }} />
+      </div>
+    </article>
+  );
+}
+css
+.lesson-card {
+  background: var(--card);
+  color: var(--fg);
+  border-radius: var(--radius);
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0,0,0,.12);
+}
+.progress {
+  height: 10px;
+  background: rgba(0,0,0,.08);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+.bar {
+  height: 100%;
+  background: var(--accent);
+}
+cultural asset
+export const APPROVED_ART_PACKS = {
+  'art-pack-001': {
+    label: 'Approved community art pack',
+    licensed: true,
+    artistAttribution: true,
+    usageScope: 'Bruhvoices app themes'
+  }
+};
+
+export function isArtPackAllowed(id) {
+  const pack = APPROVED_ART_PACKS[id];
+  return Boolean(pack?.licensed && pack?.artistAttribution && pack?.usageScope);
+}
+user choice example
+import React, { useState, useEffect } from 'react';
+import ThemePicker from './themes/ThemePicker.jsx';
+import { THEMES } from './themes/themeManifest.js';
+import { applyTheme } from './themes/applyTheme.js';
+
+export default function ThemeSettings() {
+  const [themeKey, setThemeKey] = useState(localStorage.getItem('bruhvoices-theme') || 'default');
+
+  useEffect(() => {
+    applyTheme(THEMES[themeKey]);
+    localStorage.setItem('bruhvoices-theme', themeKey);
+  }, [themeKey]);
+
+  return (
+    <section>
+      <ThemePicker value={themeKey} onChange={setThemeKey} />
+      <p>Users can choose a visual style that suits them.</p>
+    </section>
+  );
+}
+best practice
+
