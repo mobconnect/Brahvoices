@@ -1,0 +1,199 @@
+bruhvoices-language/
+  src/
+    enhancements/
+      voiceDiscovery.js
+      lessonFilters.js
+      progressStore.js
+      accessExplain.js
+    web/
+      WebAudioPlayer.jsx
+      WebLessonPlayer.jsx
+    native/
+      NativeAudioPlayer.jsx
+      NativeLessonPlayer.jsx
+src enhancements 
+export async function discoverVoices(languageCode = 'en-AU') {
+  const url = new URL('https://texttospeech.googleapis.com/v1/voices');
+  url.searchParams.set('languageCode', languageCode);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error('Failed to load voices');
+
+  const data = await res.json();
+  return (data.voices || []).map(v => ({
+    name: v.name,
+    languageCodes: v.languageCodes || [],
+    sampleRate: v.naturalSampleRateHertz || null,
+    gender: v.ssmlGender || null
+  }));
+}
+export function filterPhrases(phrases, query = '', category = 'all') {
+  const q = query.trim().toLowerCase();
+
+  return phrases.filter(p => {
+    const matchesQuery = !q || p.text.toLowerCase().includes(q);
+    const matchesCategory = category === 'all' || p.category === category;
+    return matchesQuery && matchesCategory;
+  });
+}
+src enhancements 
+const KEY = 'bruhvoices-progress';
+
+export function loadProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+export function saveProgress(progress) {
+  localStorage.setItem(KEY, JSON.stringify(progress));
+}
+
+export function markPhraseDone(phraseId) {
+  const progress = loadProgress();
+  progress[phraseId] = { done: true, updatedAt: new Date().toISOString() };
+  saveProgress(progress);
+  return progress;
+}
+src access explain
+export function explainAccess(claims = {}, context = {}) {
+  const authOk = claims.communityVoiceAccess === true;
+  const culturalOk = Boolean(
+    context.fpic === true &&
+    context.rightsHolderApproved === true &&
+    context.communityApproved === true &&
+    context.usageScope
+  );
+
+  return {
+    authOk,
+    culturalOk,
+    allowed: authOk && culturalOk
+  };
+}
+web enhancement 
+import React, { useRef, useState } from 'react';
+
+export default function WebAudioPlayer({ src }) {
+  const ref = useRef(null);
+  const [rate, setRate] = useState(1);
+
+  const play = async () => {
+    if (!ref.current) return;
+    ref.current.playbackRate = rate;
+    await ref.current.play();
+  };
+
+  return (
+    <div>
+      <audio ref={ref} src={src} controls />
+      <label>
+        Speed
+        <select value={rate} onChange={(e) => setRate(Number(e.target.value))}>
+          <option value={0.75}>0.75x</option>
+          <option value={1}>1x</option>
+          <option value={1.25}>1.25x</option>
+        </select>
+      </label>
+      <button onClick={play}>Play</button>
+    </div>
+  );
+}
+web jsx lesson player 
+import React, { useMemo, useState } from 'react';
+import WebAudioPlayer from './WebAudioPlayer.jsx';
+import { filterPhrases } from '../enhancements/lessonFilters.js';
+
+export default function WebLessonPlayer({ phrases, audioMap }) {
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const filtered = useMemo(() => filterPhrases(phrases, search, category), [phrases, search, category]);
+  const [selected, setSelected] = useState(filtered[0]?.id || '');
+  const phrase = filtered.find(p => p.id === selected) || filtered[0];
+  const src = phrase ? audioMap[phrase.id] : null;
+
+  return (
+    <div>
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search phrases" />
+      <select value={category} onChange={(e) => setCategory(e.target.value)}>
+        <option value="all">All</option>
+        <option value="starter">Starter</option>
+        <option value="practice">Practice</option>
+        <option value="restricted">Restricted</option>
+      </select>
+
+      <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+        {filtered.map(p => <option key={p.id} value={p.id}>{p.text}</option>)}
+      </select>
+
+      {src ? <WebAudioPlayer src={src} /> : <p>No audio available.</p>}
+    </div>
+  );
+}
+reactive native enhancement 
+import React, { useEffect, useState } from 'react';
+
+export default function NativeAudioPlayer({ player, url }) {
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function init() {
+      if (!player) return;
+      await player.initPlayer({ url });
+      if (mounted) setPlaying(false);
+    }
+    init();
+    return () => { mounted = false; };
+  }, [player, url]);
+
+  return (
+    <div>
+      <button onPress={async () => { await player.play(); setPlaying(true); }}>
+        {playing ? 'Playing' : 'Play'}
+      </button>
+      <button onPress={async () => { await player.pause(); setPlaying(false); }}>
+        Pause
+      </button>
+    </div>
+  );
+}
+native lesson player 
+import React, { useMemo, useState } from 'react';
+import { filterPhrases } from '../enhancements/lessonFilters.js';
+
+export default function NativeLessonPlayer({ phrases, audioMap, player }) {
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const filtered = useMemo(() => filterPhrases(phrases, search, category), [phrases, search, category]);
+  const [selected, setSelected] = useState(filtered[0]?.id || '');
+  const phrase = filtered.find(p => p.id === selected) || filtered[0];
+  const src = phrase ? audioMap[phrase.id] : null;
+
+  return (
+    <div>
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search phrases" />
+      <select value={category} onChange={(e) => setCategory(e.target.value)}>
+        <option value="all">All</option>
+        <option value="starter">Starter</option>
+        <option value="practice">Practice</option>
+        <option value="restricted">Restricted</option>
+      </select>
+
+      <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+        {filtered.map(p => <option key={p.id} value={p.id}>{p.text}</option>)}
+      </select>
+
+      {src ? <NativeAudioPlayer player={player} url={src} /> : <p>No audio available.</p>}
+    </div>
+  );
+}
+exports
+// src/index.js additions
+export { discoverVoices } from './enhancements/voiceDiscovery.js';
+export { filterPhrases } from './enhancements/lessonFilters.js';
+export { loadProgress, saveProgress, markPhraseDone } from './enhancements/progressStore.js';
+export { explainAccess } from './enhancements/accessExplain.js';
+
