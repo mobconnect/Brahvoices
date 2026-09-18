@@ -58,8 +58,6 @@ export function canUseVoice(asset, context = {}) {
     );
   }
 
-  
-
   return false;
 }
 
@@ -107,7 +105,6 @@ export function allowAsset(meta) {
     meta?.usageScope
   );
 }
-
 
 ## Add to GitHub
 GitHub says local code can be added with Git commands, then pushed to the remote repository. Use:[3][4]
@@ -235,5 +232,15 @@ export const VOICE_REGISTRY = [
 export { approveVoiceAsset } from './approveVoiceAsset.js';
 export { VOICE_REGISTRY } from './voiceRegistry.js';
 export { synthesizeToFile } from './synthesize.js';
+```
 
+## Business details
 
+- Business name: Jessica Bright
+- ABN: 59 726 146 692
+- Website: https://justbeyou.com.au
+- Domain: justbeyou.com.au
+
+## Support
+
+For support or business enquiries, visit https://justbeyou.com.au
